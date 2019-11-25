@@ -1,0 +1,496 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import numpy.random as nr
+import math
+from sklearn import preprocessing
+import sklearn.model_selection as ms
+from sklearn import linear_model
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import cross_val_score, GridSearchCV
+import sklearn.metrics as sklm
+from sklearn import feature_selection as fs
+from sklearn import metrics
+import scipy.stats as ss
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import KFold
+import xgboost as xgb
+
+raw_features = pd.read_csv('DAT102x_Predicting_Poverty_Around_the_World_-_Training_values.csv')
+raw_labels = pd.read_csv('DAT102x_Predicting_Poverty_Around_the_World_-_Training_labels.csv')
+
+# merge into single dataframe
+pov_data = pd.merge(raw_features,raw_labels,on='row_id')
+
+# Populate records with blank education levels
+literacy_true_median = pov_data[pov_data['literacy'] == True]['education_level'].median()
+literacy_false_median = pov_data[pov_data['literacy'] == False]['education_level'].median()
+
+idx = pov_data.index[pov_data['education_level'].isnull()]
+
+for i in idx:
+    if pov_data.loc[i,'literacy'] == True :
+        pov_data.loc[i,'education_level'] = literacy_true_median
+    else :
+        pov_data.loc[i,'education_level'] = literacy_false_median
+
+# Populate records with missing share HH income data
+share_hh_income_median = pov_data['share_hh_income_provided'].median()
+idx = pov_data.index[pov_data['share_hh_income_provided'].isnull()]
+
+for i in idx:
+    pov_data.loc[i,'share_hh_income_provided'] = share_hh_income_median
+
+
+# Find columns with missing data (nulls)
+null_columns = pov_data.columns[pov_data.isnull().any()]
+pov_data[null_columns].isnull().sum()
+
+# Drop columns with very little information
+pov_data = pov_data.drop('bank_interest_rate', axis=1)
+pov_data = pov_data.drop('mm_interest_rate', axis=1)
+pov_data = pov_data.drop('mfi_interest_rate', axis=1)
+pov_data = pov_data.drop('other_fsp_interest_rate', axis=1)
+
+# Drop rows without data
+pov_data = pov_data.dropna()
+print(pov_data.shape)
+pov_data.dtypes
+
+pov_data['fin_shock'] = pov_data['num_shocks_last_year'] * pov_data['avg_shock_strength_last_year']
+# pov_data['religion_in_country'] = pov_data['religion'] + pov_data['country']
+pov_data['phone_capacity'] = pov_data['phone_technology'] * pov_data['phone_ownership']
+pov_data['phone_capability'] = ((pov_data['can_call'] *  1) 
+                               + (pov_data['can_text'] *  1)
+                               + (pov_data['can_use_internet'] *  1)
+                               + (pov_data['can_make_transaction'] *  1) 
+                               + (pov_data['advanced_phone_use'] *  1))
+
+# create array of labels
+labels = np.array(pov_data['poverty_probability'])
+
+def encode_string(cat_features):
+    ## First encode the strings to numeric categories
+    enc = preprocessing.LabelEncoder()
+    enc.fit(cat_features)
+    enc_cat_features = enc.transform(cat_features)
+    ## Now, apply one hot encoding
+    ohe = preprocessing.OneHotEncoder()
+    encoded = ohe.fit(enc_cat_features.reshape(-1,1))
+    return encoded.transform(enc_cat_features.reshape(-1,1)).toarray()
+
+# Select Categorical Columns
+
+categorical_columns = np.array(['country'
+#                               , 'religion_in_country'
+                              , 'employment_type_last_year'
+                              , 'religion'
+                              , 'employment_category_last_year'
+                              , 'share_hh_income_provided'
+                              , 'relationship_to_hh_head'
+                               ])
+
+# Select boolean features - can comment out those to ignore
+
+boolean_columns = np.array(['is_urban'
+                          , 'female'
+                          , 'married'
+                          , 'literacy'
+                          , 'can_add'
+                          , 'can_divide'
+                          , 'can_calc_percents'
+                          , 'can_calc_compounding'
+                          , 'employed_last_year'
+                          , 'income_ag_livestock_last_year'
+                          , 'income_friends_family_last_year'
+                          , 'income_government_last_year'
+                          , 'income_own_business_last_year'
+                          , 'income_private_sector_last_year'
+                          , 'income_public_sector_last_year'
+                          , 'formal_savings'
+                          , 'informal_savings'
+                          , 'cash_property_savings'
+                          , 'has_insurance'
+                          , 'has_investment'
+                          , 'borrowed_for_emergency_last_year'
+                          , 'borrowed_for_daily_expenses_last_year'
+                          , 'borrowed_for_home_or_biz_last_year'
+                          , 'can_call'
+                          , 'can_text'
+                          , 'can_use_internet'
+                          , 'can_make_transaction'
+                          , 'advanced_phone_use'
+                          , 'reg_bank_acct'
+                          , 'reg_mm_acct'
+                          , 'reg_formal_nbfi_account'
+                          , 'financially_included'         
+                          , 'active_bank_user'
+                          , 'active_mm_user'
+                          , 'active_formal_nbfi_user'
+                          , 'active_informal_nbfi_user'
+                          , 'nonreg_active_mm_user'
+                           ])
+
+
+# Select numeric features - can comment out those to ignore
+
+numeric_columns = np.array(['education_level'
+                          , 'num_times_borrowed_last_year'
+                          , 'borrowing_recency'
+                          , 'num_shocks_last_year'
+                          , 'avg_shock_strength_last_year'
+                          , 'fin_shock'
+                          , 'phone_technology'
+                          , 'phone_ownership'
+                          , 'phone_capacity'
+                          , 'phone_capability'
+                          , 'num_formal_institutions_last_year'
+                          , 'num_informal_institutions_last_year'
+                          , 'num_financial_activities_last_year'
+                          , 'age'
+                           ]) 
+
+
+# Create array of Features
+
+Features = encode_string(pov_data[categorical_columns[0]])
+for i in range(categorical_columns.size) :
+    if i != 0 :
+        temp = encode_string(pov_data[categorical_columns[i]])
+        Features = np.concatenate([Features, temp], axis = 1)
+
+
+for col in boolean_columns :
+    Features = np.concatenate([Features, np.array(pov_data[[col]])], axis = 1)
+
+
+for col in numeric_columns :
+    Features = np.concatenate([Features, np.array(pov_data[[col]])], axis = 1)
+
+
+# Split into Training and Test
+## Randomly sample cases to create independent training and test data
+nr.seed(1974)
+indx = range(Features.shape[0])
+indx = ms.train_test_split(indx, test_size = 3000)
+x_train = Features[indx[0],:]
+y_train = np.ravel(labels[indx[0]])
+x_test = Features[indx[1],:]
+y_test = np.ravel(labels[indx[1]])
+
+
+# Scale Numeric Columns
+nbr_nums = numeric_columns.size * -1
+if nbr_nums < -1 :
+    scaler = preprocessing.StandardScaler().fit(x_train[:,nbr_nums:-2])
+    x_train[:,nbr_nums:-2] = scaler.transform(x_train[:,nbr_nums:-2])
+    x_test[:,nbr_nums:-2] = scaler.transform(x_test[:,nbr_nums:-2])
+
+if numeric_columns[-1] == 'age': 
+    scaler_last = preprocessing.MinMaxScaler().fit(x_train[:,-1:])
+else :
+    scaler_last = preprocessing.MinMaxScaler().fit(x_train[:,-1:])
+
+x_train[:,-1:] = scaler_last.transform(x_train[:,-1:])
+x_test[:,-1:] = scaler_last.transform(x_test[:,-1:])
+
+# Fit a random forest model
+# rf_mod = RandomForestRegressor(n_estimators=1500, max_depth=15)
+# rf_mod.fit(x_train, y_train)
+# y_score = rf_mod.predict(x_test)
+
+# Determine best depth
+# crossvalidation = KFold(n_splits=10, shuffle=True, random_state=1974)
+# for depth in range (0,10):
+#      xgb_mod=xgb.XGBRegressor(n_estimators=500, max_depth=depth)
+#      score=np.mean(cross_val_score(xgb_mod,x_train,y_train,scoring='r2', cv=crossvalidation,n_jobs=1))
+#      print(depth, score)
+
+# Determine metrics for model based on full set of features
+def print_metrics(y_true, y_predicted, n_parameters):
+    ## First compute R^2 and the adjusted R^2
+    r2 = sklm.r2_score(y_true, y_predicted)
+    r2_adj = r2 - (n_parameters - 1)/(y_true.shape[0] - n_parameters) * (1 - r2)
+    
+    ## Print the usual metrics and the R^2 values
+    print('Mean Square Error      = ' + str(sklm.mean_squared_error(y_true, y_predicted)))
+    print('Root Mean Square Error = ' + str(math.sqrt(sklm.mean_squared_error(y_true, y_predicted))))
+    print('Mean Absolute Error    = ' + str(sklm.mean_absolute_error(y_true, y_predicted)))
+    print('Median Absolute Error  = ' + str(sklm.median_absolute_error(y_true, y_predicted)))
+    print('R^2                    = ' + str(r2))
+    print('Adjusted R^2           = ' + str(r2_adj))
+
+def hist_resids(y_test, y_score):
+    ## first compute vector of residuals. 
+    resids = np.subtract(y_test.reshape(-1,1), y_score.reshape(-1,1))
+    ## now make the residual plots
+    sns.distplot(resids)
+    plt.title('Histogram of residuals')
+    plt.xlabel('Residual value')
+    plt.ylabel('count')
+    plt.show()
+
+def resid_qq(y_test, y_score):
+    ## first compute vector of residuals. 
+    resids = np.subtract(y_test.reshape(-1,1), y_score.reshape(-1,1))
+    ## now make the residual plots
+    ss.probplot(resids.flatten(), plot = plt)
+    plt.title('Residuals vs. predicted values')
+    plt.xlabel('Predicted values')
+    plt.ylabel('Residual')
+    plt.show()
+
+def resid_plot(y_test, y_score):
+    ## first compute vector of residuals. 
+    resids = np.subtract(y_test.reshape(-1,1), y_score.reshape(-1,1))
+    ## now make the residual plots
+    sns.regplot(y_score, resids, fit_reg=False)
+    plt.title('Residuals vs. predicted values')
+    plt.xlabel('Predicted values')
+    plt.ylabel('Residual')
+    plt.show()
+
+
+# Load training data into DMatrix object
+# dtrain = xgb.DMatrix(Features, label=label)
+
+# Fix learning rate and number of estimators
+xgb1 = xgb.XGBRegressor(
+                    learning_rate =0.1,
+                    n_estimators=1000,
+                    max_depth=5,
+                    min_child_weight=1,
+                    gamma=0,
+                    subsample=0.8,
+                    colsample_bytree=0.8,
+                    objective= 'reg:squarederror',
+                    scale_pos_weight=1,
+                    seed=1974)
+xgb1.fit(x_train, y_train)
+
+y_score = xgb1.predict(x_test)
+
+n_parameters = categorical_columns.size + boolean_columns.size + numeric_columns.size
+
+def check_model ():
+    np.min(y_score)
+    np.max(y_score)
+    for x in range(y_score.size):
+        if y_score[x] > 1 :
+            y_score[x] = 1
+        elif y_score[x] < 0:
+            y_score[x] = 0
+        else :
+            y_score[x] = y_score[x]
+    
+    print_metrics(y_test, y_score, n_parameters)    
+    hist_resids(y_test, y_score)    
+    resid_qq(y_test, y_score)   
+    resid_plot(y_test, y_score) 
+
+###########################################################
+# Tune max depth and min child weight and return CV score #
+###########################################################
+
+param_test1 = {
+ 'max_depth':range(3,10,2),
+ 'min_child_weight':range(1,6,2)
+}
+gsearch1 = GridSearchCV(estimator = xgb.XGBRegressor( learning_rate =0.1, n_estimators=160, 
+ gamma=0, subsample=0.8, colsample_bytree=0.8,
+ objective= 'reg:squarederror', scale_pos_weight=1, seed=1974), 
+ param_grid = param_test1, scoring='r2',iid=False, cv=10)
+grid_result1 = gsearch1.fit(x_train,y_train)
+
+best_params = grid_result1.best_params_
+print(best_params)
+gsearch1.best_score_
+
+param_test2 = {
+ 'max_depth':[4,5,6],
+ 'min_child_weight':[1,2]
+}
+
+# Refine parameters further - look for either side of ideal (max depth = 5, min child weight = 1)
+
+gsearch2 = GridSearchCV(estimator = xgb.XGBRegressor( learning_rate =0.1, n_estimators=160, 
+ gamma=0, subsample=0.8, colsample_bytree=0.8,
+ objective= 'reg:squarederror', scale_pos_weight=1, seed=1974), 
+ param_grid = param_test2, scoring='r2',iid=False, cv=10)
+grid_result2 = gsearch2.fit(x_train,y_train)
+
+best_params = grid_result2.best_params_
+print(best_params)
+gsearch2.best_score_
+
+xgb2 = xgb.XGBRegressor( learning_rate = 0.1
+                       , n_estimators = 160
+                       , max_depth = best_params['max_depth']
+                       , min_child_weight = best_params['min_child_weight']
+                       , gamma = 0
+                       , subsample = 0.8
+                       , colsample_bytree = 0.8
+                       , objective= 'reg:squarederror'
+                       , scale_pos_weight = 1
+                       , seed = 1974)
+
+xgb2.fit(x_train, y_train)
+y_scores = xgb2.predict(x_test)
+check_model()
+
+##################
+# Tune for gamma #
+##################
+
+param_test3 = {
+ 'gamma':[i/10.0 for i in range(0,5)]
+}
+
+gsearch3 = GridSearchCV(estimator = xgb.XGBRegressor( learning_rate =0.1
+                                                    , n_estimators=160
+                                                    , subsample=0.8
+                                                    , colsample_bytree=0.8
+                                                    , objective= 'reg:squarederror'
+                                                    , scale_pos_weight=1
+                                                    , seed=1974)
+                       , param_grid = param_test2
+                       , scoring='r2'
+                       , iid=False
+                       , cv=10)
+grid_result3 = gsearch3.fit(x_train,y_train)
+
+best_params = grid_result3.best_params_
+print(best_params)
+gsearch3.best_score_
+
+xgb3 = xgb.XGBRegressor( learning_rate = 0.1
+                       , n_estimators = 160
+                       , max_depth = 5
+                       , min_child_weight = 1
+                       , gamma = best_params['gamma']
+                       , subsample = 0.8
+                       , colsample_bytree = 0.8
+                       , objective= 'reg:squarederror'
+                       , scale_pos_weight = 1
+                       , seed = 1974)
+
+xgb3.fit(x_train, y_train)
+y_scores = xgb3.predict(x_test)
+check_model()
+
+xgb2a = xgb.XGBRegressor( learning_rate = 0.1
+                        , n_estimators = 500
+                        , max_depth = 5
+                        , min_child_weight = 1
+                        , gamma = 0.2
+                        , subsample = 0.7
+                        , colsample_bytree = 0.7
+                        , objective= 'reg:squarederror'
+                        , reg_alpha = 1
+                        , scale_pos_weight = 1
+                        , seed = 1974)
+
+xgb2a.fit(x_train, y_train)
+y_score = xgb2a.predict(x_test)
+print_metrics(y_test, y_score, n_parameters)    
+
+
+
+
+importances = rf_mod.feature_importances_
+std = np.std([tree.feature_importances_ for tree in rf_mod.estimators_],
+             axis=0)
+indices = np.argsort(importances)[::-1]
+
+# Print the feature ranking
+print("Feature ranking:")
+
+for f in range(x_train.shape[1]):
+    print("%d. feature %d (%f)" % (f + 1, indices[f], importances[indices[f]]))
+
+# Plot the feature importances of the forest
+plt.figure()
+plt.title("Feature importances")
+plt.bar(range(x_train.shape[1]), importances[indices],
+       color="r", yerr=std[indices], align="center")
+plt.xticks(range(x_train.shape[1]), indices)
+plt.xlim([-1, x_train.shape[1]])
+plt.show()
+
+#################################################################
+
+# Load competition test data
+
+comp_test_data = pd.read_csv('DAT102x_Predicting_Poverty_Around_the_World_-_Test_values.csv')
+
+null_columns = comp_test_data.columns[comp_test_data.isnull().any()]
+# comp_test_data[null_columns].isnull().sum()
+literacy_true_median = comp_test_data[comp_test_data['literacy'] == True]['education_level'].median()
+literacy_false_median = comp_test_data[comp_test_data['literacy'] == False]['education_level'].median()
+
+idx = comp_test_data.index[comp_test_data['education_level'].isnull()]
+
+for i in idx:
+    if comp_test_data.loc[i,'literacy'] == True :
+        comp_test_data.loc[i,'education_level'] = literacy_true_median
+    else :
+        comp_test_data.loc[i,'education_level'] = literacy_false_median
+
+share_hh_income_median = comp_test_data['share_hh_income_provided'].median()
+idx = comp_test_data.index[comp_test_data['share_hh_income_provided'].isnull()]
+
+for i in idx:
+    comp_test_data.loc[i,'share_hh_income_provided'] = share_hh_income_median
+
+comp_test_data['fin_shock'] = comp_test_data['num_shocks_last_year'] * comp_test_data['avg_shock_strength_last_year']
+# comp_test_data['religion_in_country'] = comp_test_data['religion'] + comp_test_data['country']
+comp_test_data['phone_capacity'] = comp_test_data['phone_technology'] * comp_test_data['phone_ownership']
+comp_test_data['phone_capability'] = ((comp_test_data['can_call'] *  1) 
+                               + (comp_test_data['can_text'] *  1)
+                               + (comp_test_data['can_use_internet'] *  1)
+                               + (comp_test_data['can_make_transaction'] *  1) 
+                               + (comp_test_data['advanced_phone_use'] *  1))
+
+
+# Create array of Comp Test Features
+
+comp_test_features = encode_string(comp_test_data[categorical_columns[0]])
+for i in range(categorical_columns.size) :
+    if i != 0 :
+        temp = encode_string(comp_test_data[categorical_columns[i]])
+        comp_test_features = np.concatenate([comp_test_features, temp], axis = 1)
+
+
+for col in boolean_columns :
+    comp_test_features = np.concatenate([comp_test_features, np.array(comp_test_data[[col]])], axis = 1)
+
+
+for col in numeric_columns :
+    comp_test_features = np.concatenate([comp_test_features, np.array(comp_test_data[[col]])], axis = 1)
+
+
+
+# Scale Numeric Columns
+if nbr_nums < -1 :
+    comp_test_features[:,nbr_nums:-2] = scaler.transform(comp_test_features[:,nbr_nums:-2])
+
+
+comp_test_features[:,-1:] = scaler_last.transform(comp_test_features[:,-1:])
+
+comp_score = xgb2a.predict(comp_test_features) 
+
+np.min(comp_score)
+np.max(comp_score)
+
+for x in range(comp_score.size):
+    if comp_score[x] > 1 :
+        comp_score[x] = 1
+    elif comp_score[x] < 0:
+        comp_score[x] = 0
+    else :
+        comp_score[x] = comp_score[x]
+
+
+comp_score_df = pd.DataFrame(comp_score)
+comp_score_df.to_csv('Comp_Regression_Predictions v11d.csv', index=True, header=True)
