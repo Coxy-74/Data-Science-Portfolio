@@ -1,0 +1,303 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import numpy.random as nr
+import math
+from sklearn import preprocessing
+import sklearn.model_selection as ms
+from sklearn import linear_model
+from sklearn.ensemble import RandomForestRegressor
+import sklearn.metrics as sklm
+from sklearn import feature_selection as fs
+from sklearn import metrics
+import scipy.stats as ss
+
+
+raw_features = pd.read_csv('DAT102x_Predicting_Poverty_Around_the_World_-_Training_values.csv')
+raw_labels = pd.read_csv('DAT102x_Predicting_Poverty_Around_the_World_-_Training_labels.csv')
+
+# merge into single dataframe
+pov_data = pd.merge(raw_features,raw_labels,on='row_id')
+
+# Populate records with blank education levels
+literacy_true_median = pov_data[pov_data['literacy'] == True]['education_level'].median()
+literacy_false_median = pov_data[pov_data['literacy'] == False]['education_level'].median()
+
+idx = pov_data.index[pov_data['education_level'].isnull()]
+
+for i in idx:
+    if pov_data.loc[i,'literacy'] == True :
+        pov_data.loc[i,'education_level'] = literacy_true_median
+    else :
+        pov_data.loc[i,'education_level'] = literacy_false_median
+
+# Populate records with missing share HH income data
+share_hh_income_median = pov_data['share_hh_income_provided'].median()
+idx = pov_data.index[pov_data['share_hh_income_provided'].isnull()]
+
+for i in idx:
+    pov_data.loc[i,'share_hh_income_provided'] = share_hh_income_median
+
+
+# Find columns with missing data (nulls)
+null_columns = pov_data.columns[pov_data.isnull().any()]
+pov_data[null_columns].isnull().sum()
+
+# Drop columns with very little information
+pov_data = pov_data.drop('bank_interest_rate', axis=1)
+pov_data = pov_data.drop('mm_interest_rate', axis=1)
+pov_data = pov_data.drop('mfi_interest_rate', axis=1)
+pov_data = pov_data.drop('other_fsp_interest_rate', axis=1)
+
+# Drop rows without data
+pov_data = pov_data.dropna()
+print(pov_data.shape)
+pov_data.dtypes
+
+# Feature Engineering
+pov_data['fin_shock'] = pov_data['num_shocks_last_year'] * pov_data['avg_shock_strength_last_year']
+pov_data['religion_in_country'] = pov_data['religion'] + pov_data['country']
+pov_data['phone_capacity'] = pov_data['phone_technology'] * pov_data['phone_ownership']
+pov_data['phone_capability'] = ((pov_data['can_call'] *  1) 
+                               + (pov_data['can_text'] *  1)
+                               + (pov_data['can_use_internet'] *  1)
+                               + (pov_data['can_make_transaction'] *  1) 
+                               + (pov_data['advanced_phone_use'] *  1))
+
+# visualising data
+pov_data.describe()
+
+
+# Select Categorical Columns
+
+categorical_columns = np.array(['religion_in_country'
+                              , 'country'
+                              , 'employment_type_last_year'
+                              , 'religion'
+                              , 'employment_category_last_year'
+                              , 'relationship_to_hh_head'
+                               ])
+
+# Select boolean features - can comment out those to ignore
+
+boolean_columns = np.array(['is_urban'
+                          , 'female'
+                          , 'married'
+                          , 'literacy'
+                          , 'can_add'
+                          , 'can_divide'
+                          , 'can_calc_percents'
+                          , 'can_calc_compounding'
+                          , 'employed_last_year'
+                          , 'income_ag_livestock_last_year'
+                          , 'income_friends_family_last_year'
+                          , 'income_government_last_year'
+                          , 'income_own_business_last_year'
+                          , 'income_private_sector_last_year'
+                          , 'income_public_sector_last_year'
+                          , 'formal_savings'
+                          , 'informal_savings'
+                          , 'cash_property_savings'
+                          , 'has_insurance'
+                          , 'has_investment'
+                          , 'borrowed_for_emergency_last_year'
+                          , 'borrowed_for_daily_expenses_last_year'
+                          , 'borrowed_for_home_or_biz_last_year'
+                          , 'can_call'
+                          , 'can_text'
+                          , 'can_use_internet'
+                          , 'can_make_transaction'
+                          , 'advanced_phone_use'
+                          , 'reg_bank_acct'
+                          , 'reg_mm_acct'
+                          , 'reg_formal_nbfi_account'
+                          , 'financially_included'         
+                          , 'active_bank_user'
+                          , 'active_mm_user'
+                          , 'active_formal_nbfi_user'
+                          , 'active_informal_nbfi_user'
+                          , 'nonreg_active_mm_user'
+                           ])
+
+
+# Select numeric features - can comment out those to ignore
+
+numeric_columns = np.array(['education_level'
+                          , 'share_hh_income_provided'
+                          , 'num_times_borrowed_last_year'
+                          , 'borrowing_recency'
+                          , 'num_shocks_last_year'
+                          , 'avg_shock_strength_last_year'
+                          , 'fin_shock'
+                          , 'phone_technology'
+                          , 'phone_ownership'
+                          , 'num_formal_institutions_last_year'
+                          , 'num_informal_institutions_last_year'
+                          , 'num_financial_activities_last_year'
+                          , 'phone_capacity'
+                          , 'phone_capability'
+                          , 'age'
+                           ]) 
+
+# Scatter Plots for numeric columns
+
+def plot_scatter(pov_data, cols, col_y = 'poverty_probability'):
+    for col in cols:
+        fig = plt.figure(figsize=(7,6)) # define plot area
+        ax = fig.gca() # define axis   
+        pov_data.plot.scatter(x = col, y = col_y, ax = ax)
+        ax.set_title('Scatter plot of ' + col_y + ' vs. ' + col) # Give the plot a main title
+        ax.set_xlabel(col) # Set text for the x axis
+        ax.set_ylabel(col_y
+                     )# Set text for y axis
+        plt.show()
+
+plot_scatter(pov_data, numeric_columns)    
+
+
+
+# Box Plots for categorical columns
+
+def plot_box(pov_data, cols, col_y = 'poverty_probability'):
+    for col in cols:
+        sns.set_style("whitegrid")
+        sns.boxplot(col, col_y, data=pov_data)
+        plt.xlabel(col) # Set text for the x axis
+        plt.ylabel(col_y)# Set text for y axis
+        plt.show()
+
+plot_box(pov_data, categorical_columns)
+
+
+# Violin Plots for categorical columns
+
+def plot_violin(pov_data, cols, col_y = 'poverty_probability'):
+    for col in cols:
+        sns.set_style("whitegrid")
+        sns.violinplot(col, col_y, data=pov_data)
+        plt.xlabel(col) # Set text for the x axis
+        plt.ylabel(col_y)# Set text for y axis
+        plt.show()
+
+plot_violin(pov_data, categorical_columns) 
+
+
+# Split Violin Plots
+
+def plot_violin_hue(pov_data, cols, col_y, hue_col):
+    for col in cols:
+        sns.set_style("whitegrid")
+        sns.violinplot(col, col_y, data=pov_data, hue = hue_col, split = True)
+        plt.xlabel(col) # Set text for the x axis
+        plt.ylabel(col_y)# Set text for y axis
+        plt.show()
+
+plot_violin_hue(pov_data, categorical_columns, 'poverty_probability', 'active_formal_nbfi_user')    
+
+   
+# Create array of Features
+
+Features = encode_string(pov_data[categorical_columns[0]])
+for i in range(categorical_columns.size) :
+    if i != 0 :
+        temp = encode_string(pov_data[categorical_columns[i]])
+        Features = np.concatenate([Features, temp], axis = 1)
+
+
+for col in boolean_columns :
+    Features = np.concatenate([Features, np.array(pov_data[[col]])], axis = 1)
+
+
+for col in numeric_columns :
+    Features = np.concatenate([Features, np.array(pov_data[[col]])], axis = 1)
+
+
+# Split into Training and Test
+## Randomly sample cases to create independent training and test data
+nr.seed(1974)
+indx = range(Features.shape[0])
+indx = ms.train_test_split(indx, test_size = 3000)
+x_train = Features[indx[0],:]
+y_train = np.ravel(labels[indx[0]])
+x_test = Features[indx[1],:]
+y_test = np.ravel(labels[indx[1]])
+
+
+# Scale Numeric Columns
+nbr_nums = numeric_columns.size * -1
+scaler = preprocessing.MinMaxScaler().fit(x_train[:,nbr_nums:])
+x_train[:,nbr_nums:] = scaler.transform(x_train[:,nbr_nums:])
+x_test[:,nbr_nums:] = scaler.transform(x_test[:,nbr_nums:])
+
+
+# Fit a random forest model
+lin_mod = linear_model.LinearRegression(fit_intercept=False) 
+lin_mod.fit(x_train, y_train)
+y_score = lin_mod.predict(x_test)
+
+n_parameters = categorical_columns.size + boolean_columns.size + numeric_columns.size
+
+
+# Determine metrics for model based on full set of features
+def print_metrics(y_true, y_predicted, n_parameters):
+    ## First compute R^2 and the adjusted R^2
+    r2 = sklm.r2_score(y_true, y_predicted)
+    r2_adj = r2 - (n_parameters - 1)/(y_true.shape[0] - n_parameters) * (1 - r2)
+    
+    ## Print the usual metrics and the R^2 values
+    print('Mean Square Error      = ' + str(sklm.mean_squared_error(y_true, y_predicted)))
+    print('Root Mean Square Error = ' + str(math.sqrt(sklm.mean_squared_error(y_true, y_predicted))))
+    print('Mean Absolute Error    = ' + str(sklm.mean_absolute_error(y_true, y_predicted)))
+    print('Median Absolute Error  = ' + str(sklm.median_absolute_error(y_true, y_predicted)))
+    print('R^2                    = ' + str(r2))
+    print('Adjusted R^2           = ' + str(r2_adj))
+
+np.min(y_score)
+np.max(y_score)
+for x in range(y_score.size):
+    if y_score[x] > 1 :
+        y_score[x] = 1
+    elif y_score[x] < 0:
+        y_score[x] = 0
+    else :
+        y_score[x] = y_score[x]
+
+print_metrics(y_test, y_score, n_parameters)    
+
+def hist_resids(y_test, y_score):
+    ## first compute vector of residuals. 
+    resids = np.subtract(y_test.reshape(-1,1), y_score.reshape(-1,1))
+    ## now make the residual plots
+    sns.distplot(resids)
+    plt.title('Histogram of residuals')
+    plt.xlabel('Residual value')
+    plt.ylabel('count')
+    plt.show()
+
+hist_resids(y_test, y_score)    
+
+def resid_qq(y_test, y_score):
+    ## first compute vector of residuals. 
+    resids = np.subtract(y_test.reshape(-1,1), y_score.reshape(-1,1))
+    ## now make the residual plots
+    ss.probplot(resids.flatten(), plot = plt)
+    plt.title('Residuals vs. predicted values')
+    plt.xlabel('Predicted values')
+    plt.ylabel('Residual')
+    plt.show()
+
+resid_qq(y_test, y_score)   
+
+def resid_plot(y_test, y_score):
+    ## first compute vector of residuals. 
+    resids = np.subtract(y_test.reshape(-1,1), y_score.reshape(-1,1))
+    ## now make the residual plots
+    sns.regplot(y_score, resids, fit_reg=False)
+    plt.title('Residuals vs. predicted values')
+    plt.xlabel('Predicted values')
+    plt.ylabel('Residual')
+    plt.show()
+
+resid_plot(y_test, y_score) 
+
