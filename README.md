@@ -10,6 +10,7 @@ A collection of works to showcase my data science skills.
     <br>
 2. Coursera - Contents generated as part of Johns Hopkins Data Science Certification through Coursera.  
   Includes:  
+    - run_analysis.R - script to tidy a dataset from the "Getting and Cleaning Data" course
     - Analysis of US Storm Events and their Economic and Health Impacts
   
 3. Coop
