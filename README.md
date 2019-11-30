@@ -1,5 +1,5 @@
 # Data-Science-Portfolio
-A collection of works to showcase my data science skills.
+A small collection of works to showcase my data science skills.
 
 ## Contents
 1. Microsoft - Contents generated as part of Microsoft Professional Program in Data Science.   
@@ -13,5 +13,3 @@ A collection of works to showcase my data science skills.
     - run_analysis.R - script to tidy a dataset from the "Getting and Cleaning Data" course
     - Storm_Analysis.Rmd - R Markdown document containing an analysis of US Storm Events and their economic and health impacts  
     - Storm_Analysis.pdf - PDF document created from R Markdown document
-  
-3. Coop
