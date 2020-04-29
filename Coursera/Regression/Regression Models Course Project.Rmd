@@ -1,0 +1,178 @@
+---
+output: pdf_document
+---
+```{r, echo = FALSE}
+docdate <- format(Sys.Date(),"%d %b %Y")
+```
+
+---
+title: "Regression Models Course Project"
+author: "Simon Cox, `r docdate`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, cache=FALSE, include=TRUE)
+shhh <- suppressPackageStartupMessages 
+shhh(library(ggplot2))
+shhh(library(GGally))
+shhh(library(knitr))
+shhh(library(datasets))
+shhh(library(corrplot))
+shhh(library(ggcorrplot))
+data(mtcars)
+simple_linear_1 <- lm(mpg ~ am,mtcars)
+ml3 <- lm(mpg ~ am + wt + qsec, data = mtcars)
+```
+
+## Executive Summary  
+This report investigates 2 items of interest using data provided by the mtcars dataset in R. The summary of findings for these is below:  
+
+**Item 1) Is an automatic or manual transmission better for MPG?**  
+All analysis and modelling of the data indicates that a manual transmission is likely to be better for MPG.
+
+**Item 2) Quantify the difference between manual and automatic transmissions.**  
+When using a simple linear regression model, we can say with 95% confidence that a manual transmission will provide somewhere between `r round(confint(simple_linear_1)[2,1],2)` and `r round(confint(simple_linear_1)[2,2],2)` mpg improvement over an automatic transmission.  
+When using a multivariable regression model using transmission type, weight and quarter mile time as regressors we can say with 95% confidence that a manual transmission will provide an improvement of somewhere between
+`r round(confint(ml3)[2,1],2)` and `r round(confint(ml3)[2,2],2)` mpg over automatic transmissions, when keeping the other regressors constant.
+
+## Investigations  
+The first step in answering this question is to perform a quick analysis of the relationship between mpg and transmission type (referenced as "am" in the dataset). A boxplot provides a useful view and is provided in Figure 1 of the Appendix. The boxplot on its own shows that there is a clear distinction between the mpg for the transmission types, with automatic transmission having lower mpg. However when we look at the datapoints overlaid on the boxplot we see that things aren't necessarily as clear cut as this, with some manual transmissions performing worse than the median mpg for automatic transmissions.  
+We might also look for the correlation between the mpg and the automatic and manual transmissions (note that the dataset assigns a value of 0 for automatic and 1 for manual). 
+The correlation value is `r round(cor(mtcars$mpg, mtcars$am),4)` which shows that there is some correlation but by no means could it be considered to be statistically strong.  
+
+### Simple Linear Regression
+Nevertheless we can use a simple linear regression to see if we can get a good model. Figure 2 in the appendix shows the resulting summary information for this regression. The coefficients and related 95% confidence intervals are shown below:  
+
+```{r simple_linear, echo=FALSE, collapse = TRUE}
+simple_linear <- lm(mpg ~ am, data = mtcars)
+coef(simple_linear); confint(simple_linear)
+```
+
+This model is suggesting that automatic transmissions (i.e. where the "am" variable has a value of 0) will provide somewhere between **`r round(confint(simple_linear)[1,1],2)` and `r round(confint(simple_linear)[1,2],2)` mpg** with 95% confidence, as provided by the intercept. Additionally, we can interpret the coefficient to mean that manual transmissions (i.e. where the "am" variable has a value of 1) will provide somewhere between
+**`r round(confint(simple_linear)[2,1],2)` and `r round(confint(simple_linear)[2,2],2)` mpg** improvement over an automatic transmission, with 95% confidence.  
+  
+Figure 3 in the appendix shows us the residual plots. The residuals vs fitted values shows that there is a distinct pattern for residuals which is not surprising given the simplicity of the model. The Q-Q plot shows that the points are somewhat close to the diagonal line which indicates that the residuals are fairly normal in their distribution. 
+Finally we can take a look at the adjusted R-squared figure which can give an indication as to the goodness of fit. For the simple linear model the adjusted R-squared is **`r round(summary(simple_linear)$adj.r.squared,4)`**, which indicates that perhaps the model could be improved.
+
+### Multivariable Regression
+
+Simple linear regression gave us a basic model, although the adjusted R-squared figure suggests it can be improved. Indeed common sense would tell us that there are probably other variables at play when it comes to the mpg achieved for a particular model of car. Therefore we can look to other variables provided in the dataset to try and get a more comprehensive model that might tell us the impact of the transmission type if we keep the other variables constant.  
+  
+The first step is to determine which variables to include in the model. We know that the inclusion of variables with a high degree of correlation can be detrimental to the model, therefore we can look at a correlation matrix  plot to identify highly correlated variables. This is shown in Figure 4 of the Appendix.  
+  
+Correlations with an absolute value of > 0.7 are considered significant. With this in mind we can see that there are 2 variables correlated to "am" - these are "drat" (rear axle ratio) and "gear" (number of forward gears). Therefore we will leave those 2 variables out of the model because we know that we need to include "am".  
+  
+We can see high correlation between 4 variables: "wt" (weight), "disp" (displacement), "hp" (gross horsepower) and "cyl" (number of cylinders). We will choose only one of these, weight, to include in the model. The remaining variables do not show high levels of correlation and will remain in the model: "carb" (number of carburetors), "qsec" (1/4 mile time) and "vs" (engine shape). Logic tells us that the most important factors to determine the mpg other than the transmission type will be weight, the 1/4 mile time, number of carburetors and engine shape, in that order. Therefore we will fit multiple models, incrementing the number of variables each time until all variables are used, and then run an ANOVA to determine if the addition of the variable is significant for the model. This can be seen in Figure 5 of the Appendix.  
+
+This shows us quite clearly that the 3rd model (including "am", "wt" and "qsec" as regressors) is the appropriate model to choose. It is a significant improvement on the single linear regression model, with the residual sum of squares falling from 720 to 169. The details of this model are shown in Figure 6 in the Appendix, and the coefficients and related 95% confidence intervals are shown below:
+
+```{r, echo=FALSE, collapse = TRUE}
+coef(ml3); confint(ml3)
+```
+
+This model is suggesting that manual transmissions (i.e. where the "am" variable has a value of 1) will provide an improvement of somewhere between **`r round(confint(ml3)[2,1],2)` and `r round(confint(ml3)[2,2],2)` mpg** over automatic transmissions with 95% confidence, keeping the other factors (i.e. the weight and quarter-mile time) constant.  
+  
+Figure 7 in the appendix shows us the plots that help determine whether the model is a good fit. We can say that the plot of residuals vs fitted points shows no real pattern which is good. The Q-Q plot shows that the residuals are approximately normally distributed and this all indicates that there is no bias in the residuals and therefore the model is reasonable.  
+  
+Finally we can take a look at the adjusted R-squared figure which can give an indication as to the goodness of fit. For the multivariable model the adjusted R-squared is **`r round(summary(ml3)$adj.r.squared,4)`**, which indicates that the model is a good fit and a significant improvement over the simple linear regression model.
+
+\newpage
+
+## Appendix  
+
+### Figure 1 - Boxplot showing relationship between mpg and transmission type    
+
+```{r figure1, fig.height = 2.75, fig.width = 3.5, echo = FALSE}
+Transmission <- rep.int("Automatic",dim(mtcars)[1])
+Transmission[mtcars$am == 1] <- "Manual"
+g <- ggplot(mtcars, aes(x = Transmission, y = mpg, fill = Transmission)) +
+    geom_boxplot() +
+    labs(x = "Transmission Type", y = "MPG") +
+    geom_jitter(shape=16,position=position_jitter(0.2)) +
+    theme(legend.position = "none") +
+    theme(axis.title.x = element_text(size=10) 
+    , axis.title.y = element_text(size=10))
+print(g)
+```
+
+<br>
+
+### Figure 2 - Summary of coefficients for simple linear regression    
+
+```{r figure2, echo = FALSE, collapse = TRUE}
+sl_sum <- summary(simple_linear)
+sl_sum$call
+sl_sum$coefficients[1:2,1:4]
+```
+
+<br>
+
+### Figure 3 - Residual plots from simple linear regression model  
+
+```{r figure3, echo=FALSE, fig.height = 4, fig.width = 7}
+par(mfrow = c(1,2))
+plot(mtcars$mpg, resid(simple_linear), ylab = "", xlab = "", main = "Residual Plot"
+     , cex.main = 0.8, pch = 16, col = "midnightblue", xaxt = "none", yaxt = "none")
+axis(1,cex.axis = 0.6); axis(2,cex.axis = 0.6); abline(0,0)
+mtext(side = 1, line = 2, "MPG", cex=0.7); mtext(side = 2, line = 2, "Residuals", cex = 0.7)
+sl_sum <- summary(simple_linear)
+qqnorm(sl_sum$residuals, ylab = "", xlab = "", main="Q-Q Plot - Simple Linear Regression"
+       , cex.main = 0.8, pch = 16, col = "midnightblue", xaxt = "none", yaxt = "none")
+qqline(sl_sum$residuals)
+axis(1,cex.axis = 0.6); axis(2,cex.axis = 0.6); abline(0,0)
+mtext(side = 1, line = 2, "Theoretical Quantiles", cex=0.7)
+mtext(side = 2, line = 2, "Sample Quantiles", cex = 0.7)
+```
+
+### Figure 4 - Correlation matrix plot of all variables in mtcars dataset    
+
+```{r figure4, echo = FALSE, fig.height = 5.5, fig.width = 5.5}
+mtcars.cor <- cor(mtcars)
+# corrplot(mtcars.cor)
+ggcorrplot(mtcars.cor, hc.order = TRUE, type = "lower",
+   lab = TRUE)
+```
+
+<br>
+
+### Figure 5 - Analysis of Variance (ANOVA) for multiple multivariable models    
+
+```{r figure5, echo=FALSE}
+mult_linear_1 <- lm(mpg ~ am, data = mtcars)
+mult_linear_2 <- lm(mpg ~ am + wt, data = mtcars)
+mult_linear_3 <- lm(mpg ~ am + wt + qsec, data = mtcars)
+mult_linear_4 <- lm(mpg ~ am + wt + qsec + carb, data = mtcars)
+mult_linear_5 <- lm(mpg ~ am + wt + qsec + carb + vs, data = mtcars)
+anova(mult_linear_1, mult_linear_2, mult_linear_3, mult_linear_4, mult_linear_5)
+```
+
+<br>
+
+### Figure 6 - Summary of Coefficients for multivariable regression model    
+
+```{r figure6, echo = FALSE}
+ml3s <- summary(mult_linear_3)
+ml3s$call
+ml3s$coefficients[1:4,1:4]
+```
+
+<br>
+
+### Figure 7 - Residual plots from multivariable regression model    
+
+```{r figure7, echo = FALSE, fig.height = 4, fig.width = 7}
+par(mfrow = c(1,2))
+plot(mtcars$mpg, resid(mult_linear_3), ylab = "", xlab = "", main = "Residual Plot", cex.main = 0.8
+     , pch = 16, col = "midnightblue", xaxt = "none", yaxt = "none")
+axis(1,cex.axis = 0.6); axis(2,cex.axis = 0.6); abline(0,0)
+mtext(side = 1, line = 2, "MPG", cex=0.7); mtext(side = 2, line = 2, "Residuals", cex = 0.7)
+ml_sum <- summary(mult_linear_3)
+qqnorm(ml_sum$residuals, ylab = "", xlab = "", main="Q-Q Plot - Multivariable Regression", cex.main = 0.8
+     , pch = 16, col = "midnightblue", xaxt = "none", yaxt = "none")
+qqline(ml_sum$residuals)
+axis(1,cex.axis = 0.6); axis(2,cex.axis = 0.6); abline(0,0)
+mtext(side = 1, line = 2, "Theoretical Quantiles", cex=0.7)
+mtext(side = 2, line = 2, "Sample Quantiles", cex = 0.7)
+```
+
