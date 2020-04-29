@@ -1,7 +1,8 @@
-# Data-Science-Portfolio
+# Simon Cox
+## Data-Science-Portfolio
 A small collection of works to showcase my data science skills.
 
-## Contents
+### Contents
 |File             |Description             |
 |:----------------|:-----------------------|
 |[Analysis of World Poverty Data](https://coxy-74.github.io/Data-Science-Portfolio/Microsoft/Analysis%20of%20World%20Poverty%20Data.pdf)|Capstone Project for Microsoft Professional Program in Data Science|
