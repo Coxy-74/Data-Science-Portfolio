@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Developing Data Products Course Project</title>
+  <meta name="description" content="">
+  <meta name="author" content="Simon Cox">
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="libraries/frameworks/revealjs/css/reveal.min.css">
+  <link rel="stylesheet" href="libraries/frameworks/revealjs/css/theme/default.css" id="theme">
+  <link rel="stylesheet" href="libraries/highlighters/highlight.js/css/default.css" id="theme">
+  <!--[if lt IE 9]>
+  <script src="lib/js/html5shiv.js"></script>
+  <![endif]-->  <link rel="stylesheet" href = "assets/css/ribbons.css">
+
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+      <section class='' data-state='' id='slide-1'>
+  <h2>Developing Data Products</h2>
+  <h3>Password Generator App</h3>
+
+<p>Simon Cox
+IT Consultant</p>
+
+  
+</section>
+<section class='' data-state='' id='slide-2'>
+  <h2>Password Generator</h2>
+  <ul>
+<li>A brand new Shiny App available <a href="https://coxy-74.shinyapps.io/Password-Generator/">here</a><br>
+<br></li>
+<li>What does it do?<br>
+
+<ul>
+<li>Enables you to generate a random password<br></li>
+<li>You choose the size of the password<br></li>
+<li>You can include numbers and/or special characters<br></li>
+<li>A history of your passwords is maintained for reference<br>
+<br></li>
+</ul></li>
+<li>Why do you need it?<br>
+
+<ul>
+<li>You&#39;ll never have to invent new passwords again!</li>
+<li>Your passwords will be randomised, making them very tough to break</li>
+</ul></li>
+</ul>
+
+  
+</section>
+<section class='' data-state='' id='slide-3'>
+  <h2>Intuitive and Simple to Use</h2>
+  <pre><code class="r">include_graphics(&quot;assets/img/screenshot.png&quot;)
+</code></pre>
+
+<p><img src="assets/img/screenshot.png" alt="plot of chunk unnamed-chunk-1"></p>
+
+  
+</section>
+<section class='' data-state='' id='slide-4'>
+  <h2>Security Is Everything</h2>
+  <ul>
+<li>As we know, we need to keep our passwords secure. We also need to make sure they are not easily breakable and susceptible to hackers.<br>
+<br></li>
+<li>The chart on the following slide shows how choosing a larger password makes it more secure, and less prone to being compromised.<br>
+<br></li>
+<li>As a bonus, I&#39;ve included some R code used to generate the graphic!</li>
+</ul>
+
+  
+</section>
+<section class='' data-state='' id='slide-5'>
+  <h2>Bigger is Better</h2>
+  <pre><code class="r">suppressPackageStartupMessages(library(ggplot2))
+mydf &lt;- data.frame(&quot;x&quot; = (6:50)); mydf$y &lt;- 1/mydf$x
+g &lt;- ggplot(data = mydf, aes(x=x, y=y))
+g + geom_line(arrow = arrow(angle = 15, type = &quot;closed&quot;), color = &quot;steelblue&quot;, size = 1) +
+    labs(title = &quot;Password Compromise Susceptibility&quot;, x = &quot;Length of Password&quot;, y = &quot;Susceptibility&quot;) +
+    theme(axis.text.y = element_blank(),axis.ticks.y = element_blank())
+</code></pre>
+
+<p><img src="assets/fig/unnamed-chunk-2-1.png" alt="plot of chunk unnamed-chunk-2"></p>
+
+  
+</section>
+<section class='' data-state='' id='slide-6'>
+  <h2>Conclusion</h2>
+  <ul>
+<li>If you&#39;re serious about security, you&#39;ll use this app to generate all of your random passwords.<br>
+<br>
+<br></li>
+</ul>
+
+<h4>Thank you</h4>
+
+<p><img src="assets/img/padlock.png" alt="plot of chunk unnamed-chunk-3"></p>
+
+  
+</section>
+    </div>
+  </div>
+</body>
+  <script src="libraries/frameworks/revealjs/lib/js/head.min.js"></script>
+  <script src="libraries/frameworks/revealjs/js/reveal.min.js"></script>
+  <script>
+  // Full list of configuration options available here:
+  // https://github.com/hakimel/reveal.js#configuration
+  Reveal.initialize({
+    controls: true,
+    progress: true,
+    history: true,
+    center: true,
+    theme: Reveal.getQueryHash().theme || 'default', 
+    transition: Reveal.getQueryHash().transition || 'default', 
+    dependencies: [
+    // Cross-browser shim that fully implements classList -
+    // https://github.com/eligrey/classList.js/
+      { src: 'libraries/frameworks/revealjs/lib/js/classList.js', condition: function() { return !document.body.classList;}},
+      // Zoom in and out with Alt+click
+      { src: 'libraries/frameworks/revealjs/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+      // Speaker notes
+      { src: 'libraries/frameworks/revealjs/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+      // Remote control your reveal.js presentation using a touch device
+      //{ src: 'libraries/frameworks/revealjs/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+      ]
+  });
+  </script>  <!-- LOAD HIGHLIGHTER JS FILES -->
+<script src="libraries/highlighters/highlight.js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+<!-- DONE LOADING HIGHLIGHTER JS FILES -->
+ 
+
+</html>

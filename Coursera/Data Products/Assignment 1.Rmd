@@ -1,0 +1,40 @@
+---
+title: "Developing Data Products - Assignment 1"
+author: "Simon Cox"
+date: "12 April 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(leaflet)
+```
+
+## Interactive Map
+
+Below is a map of cricket fields near Banbury in England, represented with "bat-and-ball" icons.
+
+```{r map, echo = FALSE}
+myURL <- "http://pluspng.com/img-png/cricket-bat-png-hd-cricket-balls-bat-wallpapers-free-hd-1920.png"
+myIcon <- makeIcon(iconUrl = myURL,
+                   iconWidth = 31*215/230,
+                   iconHeight = 31,
+                   iconAnchorX = 31*215/230/2,
+                   iconAnchorY = 16)
+
+cricket_grounds <- data.frame(lat = c(52.075365, 52.091880, 52.114245, 52.151943),
+                              lng = c(-1.393162, -1.389937, -1.314256, -1.511672))
+cricket_ground_details <- data.frame(name = c("Wroxton Cricket Club",
+                                              "Horley Cricket Club",
+                                              "Cropredy Cricket Club",
+                                              "Kineton Cricket Club"))
+cricket_grounds %>% 
+    leaflet() %>%
+    addTiles() %>%
+    addMarkers(popup = cricket_ground_details$name, 
+               icon = myIcon)
+# mymap
+    
+```
+
+Source: Cricket Bat PNG HD supplied by [PlusPNG](http://pluspng.com/cricket-bat-png-hd-7712.html) 
