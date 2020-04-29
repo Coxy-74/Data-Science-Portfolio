@@ -9,5 +9,6 @@ A small collection of works to showcase my data science skills.
 |[Fitness Tracker Activity Analysis](https://coxy-74.github.io/Data-Science-Portfolio/Coursera/Fitness%20Tracker/Fitness-Tracker-Analysis.html)|Reproducible research document highlighting key features of a fitness tracker activity data set|
 |[Statistical Inference Project](https://coxy-74.github.io/Data-Science-Portfolio/Coursera/Statistical%20Inference/Statistical-Inference-Project---SCox.html)|R markdown document containing statistical inferences from coursework|
 |[Regression Models Project](https://coxy-74.github.io/Data-Science-Portfolio/Coursera/Regression/Regression-Models-Course-Project.html)|R markdown document investigating the impact of transmission type on fuel efficiency using a standard cars dataset|
+|[Fitness Device Machine Learning Algorithm](https://coxy-74.github.io/Data-Science-Portfolio/Coursera/Machine%20Learning/ML-Assignment.html)|Report on outcomes of machine learning models applied to personal fitness device data|
 
 
