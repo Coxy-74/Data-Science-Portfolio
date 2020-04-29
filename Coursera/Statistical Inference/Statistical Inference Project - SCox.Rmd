@@ -1,0 +1,365 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r, echo = FALSE}
+docdate <- format(Sys.Date(),"%d %b %Y")
+```
+
+---
+title: "Statistical Inference Course Project"
+author: "Simon Cox"
+date: `r docdate`
+output: pdf_document
+---
+
+```{r setup, include=FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, cache = FALSE, include = TRUE)
+shhh <- suppressPackageStartupMessages 
+shhh(library(ggplot2))
+shhh(library(dplyr))
+shhh(library(knitr))
+shhh(library(scales))
+```
+
+# Part 1 - Simulation  
+## Overview 
+
+The first part of this assignment explores the Exponential Distribution. Simulations are run of the distribution and statistics of the simulated samples are compared with the theoretical population values.  Simulations are then run of the sampling distribution of the sample mean and the statistics of this sampling distribuion are compared with the theoretical values defined by the Central Limit Theorem (CLT).  
+
+An input to the exponential distribution is the "rate of change", usually represented by lambda. Given a rate of change, or lambda value, of 0.2 the distribution population parameters are:  
+
+* MEAN (mu) = 1/lambda = 5 
+* STANDARD DEVIATION (sd) = 1/lambda = 5  
+
+<br>
+
+## Simulations
+
+Using R we can simulate the exponential distribution for a large sample size and calculate the simulated sample mean and sample standard deviation:
+
+```{r ed_raw}
+ed_raw <- data.frame(samples = rexp(10000,rate=0.2))
+mu_raw <- format(mean(ed_raw$samples),digits = 5)
+sd_raw <- format(sd(ed_raw$samples),digits = 5)
+```
+
+In this R code we are simply running a simulation against the exponential distribution using the "rexp" function. This takes 2 parameters as input - the first is the sample size which has been set to 10,000 and the second is the lambda value which has been set to 0.2. The result of this is converted to a dataframe with a single column named "samples" and this dataframe is assigned to a variable called "ed_raw".  
+The reason this is converted to a dataframe is to enable richer ggplot functionality to draw the histogram shown in the "Distribution" section of the document, and ggplot only operates on dataframes.  
+Finally we can calculate the mean and standard deviation of our sample data using the "mean" and "sd" functions with some formatting which should be close to the theoretical population values:  
+
+|Statistic          | Population | Sample Value |
+|:------------------|-----------:|-------------:|
+|Mean               |5.0         |`r mu_raw`    |
+|Standard Deviation |5.0         |`r sd_raw`    | 
+
+This shows that the theoretical population statistics closely match those calculated for a large sample.  
+
+Now we can take a look at the sampling distribution of the sample mean values of this distribution. In other words, we can repeat the above process of taking a sample and calculating its mean many times over. The resulting set of means is itself a new distribution - for clarity we shall refer to this as the SMD - "Sample Mean Distribution".
+The SMD should have some interesting attributes in accordance with the Central Limit Theorem (CLT):  
+
+* The mean of the SMD should equal the mean of the population, which we have already 
+seen has a value of 1/lambda = 5  
+* The standard deviation of the SMD (aka the standard error) should equal the standard deviation
+of the population (which has a value of 1/lambda = 5) divided by the square root of n  
+* The shape of the SMD should be approximately normal  
+
+Using R we can simulate 1000 samples of 40 and calculate the mean for each sample. The results of each sample will be loaded into a new dataframe which represents the SMD:  
+
+```{r smd}
+means <- NULL
+for (i in 1:1000) {
+    means <- c(means, mean(rexp(40,0.2)))
+}
+smd <- data.frame(means = means)
+mu_smd <- format(mean(smd$means),digits = 5)
+sd_smd <- format(sd(smd$means),digits = 5)
+```
+This R code is similar to the first block of code we saw above in that it makes use of the "rexp" function to simulate a sample from the exponential distribution. In this case we are drawing a sample size of 40 with the same value for lambda of 0.2. However this time we are calculating the mean for the resulting sample and repeating this 1,000 times. Each time we are building an entry into a vector called "means" such that this vector will contain the means of 1,000 independent samples of size 40.  
+We are again converting this into a dataframe so that we can make use of ggplot to create the histogram used in the "Distributions" section below.  
+As done in the first simulation we can calculate the mean and standard deviation of our SMD using the "mean" and "sd" functions with some formatting. 
+<br>
+
+## Sample Mean vs Theoretical Mean
+
+According to the CLT the mean of the SMD should converge to the population mean. We can look at the results from our simulation below, where the mean of the SMD is contained within the "mu_smd" variable calculated from the block of R code above:
+
+|Statistic          |Theoretical | Sample Value |
+|:------------------|-----------:|-------------:|
+|Mean               |5.0         |`r mu_smd`    |
+
+We can clearly see that the simulation has produced results that show the mean of the SMD is very close to the population mean. This is evidence of the CLT in action which theorises that the SMD will be centred around the population mean.  
+<br>
+
+## Sample Variance vs Theoretical Variance
+
+The variance of the SMD is measured as the "standard error" - i.e. the standard deviation of the SMD. In theory the standard error of the SMD should equal the population standard deviation / sqrt(n). In this case the population standard deviation is 5 and n is 40, therefore we expect a standard error of `r format(5/sqrt(40),digits=5)`.  
+We can look at the results from our simulation below:
+
+|Statistic          |Theoretical                    | Sample Value |
+|:------------------|------------------------------:|-------------:|
+|Standard Error     |`r format(5/sqrt(40),digits=5)`|`r sd_smd`    | 
+
+
+We can clearly see that the simulation has produced results in accordance with the expected results. The standard error is very close to the theoretical value.  
+<br><br>
+We can use the variance information (in particular the standard error) to calculate a confidence interval for the mean of the SMD. The following R code calculates the lower and upper limits of a 95% confidence interval:
+
+```{r}
+ci_smd_l <- format(mean(smd$means)-qt(.975,39,lower.tail = TRUE)*(5/sqrt(40)),digits = 3)
+ci_smd_u <- format(mean(smd$means)+qt(.975,39,lower.tail = TRUE)*(5/sqrt(40)),digits = 3)
+```
+
+Here we are firstly taking the mean of the SMD and then either subtracting or adding a special value to get our lower and upper limits. The special value is the .975 quantile of the t-distribution where the degrees of freedom = 39 (i.e. sample size minus 1) multiplied by the standard error of the sample mean which we have seen is 5/sqrt(40).  
+The resulting confidence interval says that the mean of the SMD is in the range of `r ci_smd_l` and `r ci_smd_u`.  
+Therefore we can say that we expect the sample mean to reside within this range for 95% of our simulations. Alternatively we could say that we expect the sample mean to reside outside this range for 5% of our simulations, based purely on random chance.
+<br>
+
+## Distribution
+
+The exponential distribution for a large sample size that was generated in the first simulation (this was saved to the R dataframe named "ed_raw") can be summarised in a histogram using the ggplot2 plotting tool in R. The actual code has been omitted for brevity, but the resulting histogram is shown below:  
+
+<br>
+
+```{r ed_raw_hist, echo=FALSE, fig.height = 4, fig.width = 6}
+seg_start <- 15
+seg_end   <- 20
+key_text_start <- 22
+top_height <- 3000
+line_space <- 500
+text_size <- 3.5
+print (
+    ggplot(data = ed_raw, aes(x=samples)) +
+        geom_histogram(breaks=seq(0,40,by=2)
+                       , col = "blue"
+                       , aes(fill = ..count..)) +
+        geom_vline(xintercept=mean(ed_raw$samples)
+                   ,col="red"
+                   , lwd = 1) +
+        geom_vline(xintercept = 5
+                   , col = "orange"
+                   , linetype = "dashed"
+                   , lwd = 1) +
+        scale_x_continuous(breaks = c(seq(0,40,4))) +
+        annotate(geom = "segment", x = seg_start, xend = seg_end
+                 , y = top_height, yend = top_height
+                 , col = "orange"
+                 , linetype = "dashed"
+                 , lwd = 1) +
+        annotate(geom = "text", x = key_text_start, y = top_height
+                 , label = "Theoretical Mean: 5.0"
+                 , size = text_size
+                 , hjust = 0) +
+        annotate(geom = "segment", x = seg_start, xend = seg_end
+                 , y = top_height - line_space, yend = top_height - line_space
+                 , col = "red"
+                 , lwd = 1) +
+        annotate(geom = "text", x = key_text_start, y = top_height - line_space
+                 , label = paste("Simulated Mean: "
+                                 , format(mean(ed_raw$samples),digits = 5))
+                 , size = text_size
+                 , hjust = 0) +
+        annotate(geom = "text", x = seg_start, y = top_height - 2*line_space
+                 , label = paste("Theoretical Standard Deviation: 5.0")
+                 , size = text_size
+                 , hjust = 0) +
+        annotate(geom = "text", x = seg_start, y = top_height - 3*line_space
+                 , label = paste("Simulated Standard Deviation: "
+                                 , format(sd(ed_raw$samples),digits = 5))
+                 , size = text_size
+                 , hjust = 0) +
+        labs(title = "Exponential Distribution with lambda = 0.2"
+             , x = ""
+             , y = "Frequency") +
+        theme(legend.position = ""
+              , title = element_text(size = 10)
+              , plot.title = element_text(hjust = 0.5, size = 12)
+              , axis.text = element_text(size = 10)) 
+)
+```
+
+<br>
+
+As can be seen in the histogram, the theoretical population mean (5) is close to the sample mean 
+(`r format(mean(ed_raw$sample),digits=5)`) and the theoretical population standard deviation (5)
+is close to the sample standard deviation (`r format(sd(ed_raw$sample),digits=5)`). This provides some further evidence that the theoretical population mean and population standard deviation are correct.   
+Of other interest is the shape of this distribution - it shows that the distribution follows
+a hyperbolic curve tending towards zero.
+
+<br>
+
+Similarly the distribution of sample means generated in the second simulation (this was saved to the R dataframe named "smd") can be summarised in a histogram. The actual code has been omitted for brevity, but the resulting histogram is shown below:  
+
+<br>
+
+```{r smd_hist, echo=FALSE, fig.height = 5, fig.width = 6.5}
+seg_start <- 6
+seg_end   <- 7
+key_text_start <- 7.5
+top_height <- 225
+line_space <- 20
+text_size <- 3.5
+
+print (
+    ggplot(data = smd, aes(x=means)) +
+        geom_histogram(breaks=seq(0,10,by=0.5)
+                       , col = "blue"
+                       , aes(fill = ..count..)) +
+        geom_vline(xintercept=mean(smd$means)
+                   ,col="red"
+                   , lwd = 1) +
+        geom_vline(xintercept = 5
+                   , col = "orange"
+                   , linetype = "dashed"
+                   , lwd = 1) +
+        scale_x_continuous(breaks = c(seq(0,10,1))) +
+        annotate(geom = "segment", x = seg_start, xend = seg_end
+                 , y = top_height, yend = top_height
+                 , col = "orange"
+                 , linetype = "dashed"
+                 , lwd = 1) +
+        annotate(geom = "text", x = key_text_start, y = top_height
+                 , label = "Population Mean: 5.0"
+                 , size = text_size
+                 , hjust = 0) +
+        annotate(geom = "segment", x = seg_start, xend = seg_end
+                 , y = top_height - line_space, yend = top_height - line_space
+                 , col = "red"
+                 , lwd = 1) +
+        annotate(geom = "text", x = key_text_start, y = top_height - line_space
+                 , label = paste("SMD Mean: "
+                                 , format(mean(smd$means),digits = 5))
+                 , size = text_size
+                 , hjust = 0) +
+        annotate(geom = "text", x = seg_start, y = top_height - 2*line_space
+                 , label = paste("Theoretical Mean Std Error: "
+                                 , format(5/sqrt(40),digits = 5))
+                 , size = text_size
+                 , hjust = 0) +
+        annotate(geom = "text", x = seg_start, y = top_height - 3*line_space
+                 , label = paste("SMD Standard Deviation: "
+                                 , format(sd(smd$means),digits = 5))
+                 , size = text_size
+                 , hjust = 0) +
+        labs(title = "Sample Mean Distribution"
+             , x = ""
+             , y = "Frequency") +
+        theme(legend.position = ""
+              , title = element_text(size = 10)
+              , plot.title = element_text(hjust = 0.5, size = 12)
+              , axis.text = element_text(size = 10)) 
+)
+```
+<br>
+
+As can be seen in the histogram, the predictions made in the "Simulation" section of the document are true:  
+
+* The mean of the SMD (`r format(mean(smd$means),digits = 5)`) does indeed 
+converge to the true population mean of 5.  
+* The standard deviation of the SMD (`r format(sd(smd$means),digits = 5)`) does
+converge to the population standard deviation (5) divided by the square root of 
+the sample size (40).
+    * Standard Error of Mean = 5 / sqrt(40) = `r format(5/sqrt(40),digits = 5)`  
+* The shape of the SMD follows a symmetric bell curve which demonstrates that it is approximately normal.
+
+\pagebreak
+
+# Part 2 - Basic Inferential Data Analysis  
+## Overview  
+
+The second part of this assignment requires some basic analysis of the ToothGrowth dataset provided with R. This involves some exploratory data analysis and summarisation, and conducting a hypothesis test to compare tooth growth by supp and dose.  
+<br>
+
+## Exploratory Data Analysis  
+
+The first stage of the analysis is to load the ToothGrowth data into R, and retrieve its summary statistics:
+
+```{r ToothGrowth_Summ}
+data(ToothGrowth)
+head(ToothGrowth)
+summary(ToothGrowth)
+```
+
+This shows us some interesting information. Firstly the "supp" variable appears to consist of only 2 categorical values each of which appears 30 times in the full dataset of 60 records. Secondly the "dose" variable appears to have a mimimal number of entries between 0.500 and 2.000. It is possible that this is not a numerical variable, but rather a categorical variable. This is in contrast to the "len" column which seems to have a much wider range of values.  
+With this in mind we'll convert the "dose" variable from numeric to categorical and run another summary:
+
+```{r ToothGrowth_Summ2}
+ToothGrowth$dose <- as.factor(ToothGrowth$dose)
+summary(ToothGrowth)
+```
+
+This tells us a much different story with regards to the dose variable - it is indeed a categorical variable with 3 values repeated 20 times in the dataset.  
+<br>
+We can draw a boxplot to see if there is any relationship between len, dose and supp:
+
+```{r boxplot_1}
+g <- ggplot(data=ToothGrowth, aes(x=supp, y=len, fill=dose))
+g <- g + labs(title = "ToothGrowth Boxplot")
+print(g + geom_boxplot())
+```
+
+This shows us quite clearly that both the supp and dose are important factors for the len variable. There is a distinct improvement in len as the dose value gets higher, and a supp value of "OJ" looks like it performs slightly better than a supp value of "VC" although the difference isn't as pronounced.
+<br>
+
+## Hypothesis Test 1 - len by supp  
+The first hypothesis test will look at the effect of the supp variable on len.  
+
+* The null hypothesis is that there is no impact  
+    + i.e. H0: mu1 - mu2 = 0  
+    + mu1 is the mean len value where supp = "OJ"  
+    + mu2 is the mean len value where supp = "VC"  
+* The alternative hypothesis is that a supp value of "OJ" has a higher mean len than "VC"  
+    + i.e. Ha: mu1 - mu2 > 0  
+* For this test we will use a significance level (alpha) of 0.05 (i.e. 95% confidence level)  
+* Since we don't know the distribution of the population we will assume it is approximately normal and use a t-test
+
+The R code for the t-test is below. We are taking the ToothGrowth dataset, and comparing the values of len by the variable supp. The data is not paired between groups, we assume unequal variances and the alternative hypothesis is that the mean of the first group "OJ" is higher than the second group "VC".  
+
+```{r hypothesis_1}
+t <- t.test(len~supp, data=ToothGrowth, paired=FALSE, var.equal=FALSE, alternative = "greater")
+print(t)
+```
+
+The results show that the p-value is `r format(t$p.value,digits=5)` which is less than our alpha value of 0.05 and provides a statistically significant result (i.e. there is < 5% chance that we achieved this result if the null hypothesis were true). We can therefore reject the null hypothesis in favour of the alternative - i.e. a supp value of "OJ" provides greater values of len on average than does a supp value of "VC".  
+<br>
+
+## Hypothesis Test 2 - len by dose  
+The second hypothesis test will look at the effect of the dose variable on len. From the boxplots it looks like the dose does matter, so we will compare the impact on len for a dose of 0.5 vs a dose of 2.  
+
+* The null hypothesis is that there is no impact  
+    + i.e. H0: mu1 - mu2 = 0  
+    + mu1 is the mean len value where dose = "0.5"  
+    + mu2 is the mean len value where dose = "2"  
+* The alternative hypothesis is that a dose value of "2" has a higher mean len than "0.5"  
+    + i.e. Ha: mu1 - mu2 < 0  
+* For this test we will use a significance level (alpha) of 0.05 (i.e. 95% confidence level)  
+* Since we don't know the distribution of the population we will assume it is approximately normal and use a t-test
+
+The R code for the t-test is below. We are taking the ToothGrowth dataset, and creating 2 vectors; the first is the len values where dose = 0.5, and the second is the len values where dose = 2. We then run the t-test by comparing the values in these 2 groups. The data is not paired between groups, we assume unequal variances and the alternative hypothesis is that the mean of the first group "0.5" is less than than the second group "2".  
+
+```{r}
+g1 <- ToothGrowth[ToothGrowth$dose == "0.5", 1]
+g2 <- ToothGrowth[ToothGrowth$dose == "2", 1]
+t <- t.test(g1, g2, data=ToothGrowth, paired=FALSE, var.equal=FALSE, alternative = "less")
+print(t)
+```
+
+The results show that the p-value is `r t$p.value` which is a very small number! Needless to say this is less than our alpha value of 0.05 and provides a statistically significant result (i.e. there is < 5% chance that we achieved this result if the null hypothesis were true). We can therefore reject the null hypothesis in favour of the alternative - i.e. a dose value of "2" provides greater values of len on average than does a dose value of "0.5".  
+<br>
+
+## Conclusions  
+
+From the hypothesis tests we can conclude that both the supp and dose variables have an impact on the value of len. In particular:  
+
+* len is larger on average for a supp value of "OJ" than it is for a value of "VC"  
+* len is larger on average for a dose value of 2 than it is for a value of 0.5  
+
+Note that this is based on the following assumptions:  
+
+1. The samples are representative of the population  
+2. The distribution of the population is approximately normal  
+ 
+
+
+
