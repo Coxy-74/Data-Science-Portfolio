@@ -1,0 +1,259 @@
+---
+title: "Coursera Data Science Capstone - Milestone Report"
+author: "Simon Cox"
+date: "24/04/2020"
+output: 
+    html_document:
+        toc: yes
+        theme: cerulean
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(ggpubr))
+suppressPackageStartupMessages(library(scales))
+suppressPackageStartupMessages(library(knitr))
+suppressPackageStartupMessages(library(kableExtra))
+suppressPackageStartupMessages(library(quanteda))
+suppressPackageStartupMessages(library(data.table))
+```
+
+## Executive Summary
+
+This milestone report details the progress made so far on the Coursera Data Science Capstone Project. The goal of this project is to create a text prediction product, using data from 3 information sources, all in English:  
+
+* A collection of twitter feeds  
+* A collection of blogs  
+* A collection of newspaper articles  
+
+Data has been successfully ingested into R for processing. Preliminary analysis shows that the twitter feeds collection contains more entries and more sentences than the blogs and the newspaper articles. It also contains around 20% fewer words, but it is felt that having more sentences balances out the importance of the twitter file with the other 2 files (i.e. each file is as important as the other in generating a prediction model).  
+
+Following the initial analysis, some more detailed processing was performed using the "quanteda" package in R. This included combining the data into a single corpus, tokenising the data into well-formed words, generating ngram models from the tokenised data and summarising the ngram models into document feature matrices.
+
+This milestone report therefore confirms that the data has been successfully pre-processed to the point where we can begin to generate a text prediction product. This product will be built on the **keep it simple** principal - using the simplest model that provides sufficient results.
+
+<br>
+
+## Data Ingestion and Preliminary Analysis
+
+The first step was to ingest the data from the various sources which were 3 separate files containing a collection of blogs, a collection of news stories and a collection of twitter feeds respectively. The complete files were ingested into R using the `readLines` function and the initial analysis just looked at answering some fairly basic questions about the files:  
+
+* How many records / lines did each file contain?  
+* How many sentences did each file contain?  
+* How many words did each file contain?  
+
+The results are below.  
+
+<br>
+
+```{r get_fileinfo, echo = FALSE, include = FALSE}
+twitCon <- file("..\\Data\\en_US.twitter.txt")
+twit <- readLines(twitCon,encoding="UTF-8")
+close(twitCon)
+blogCon <- file("..\\Data\\en_US.blogs.txt")
+blog <- readLines(blogCon, encoding="UTF-8")
+close(blogCon)
+newsCon <- file("..\\Data\\en_US.news.txt")
+news <- readLines(newsCon, encoding="UTF-8")
+close(newsCon)
+
+info_files <- c("Twitter", "Blogs", "News")
+info_lines <- c(length(twit),length(blog),length(news))
+info_sentences <- c(sum(str_count(twit,pattern = boundary("sentence"))),
+                    sum(str_count(blog,pattern = boundary("sentence"))),
+                    sum(str_count(news,pattern = boundary("sentence"))))
+info_words <- c(sum(str_count(twit,pattern = boundary("word"))),
+                sum(str_count(blog,pattern = boundary("word"))),
+                sum(str_count(news,pattern = boundary("word"))))
+info <- data.frame("File" = info_files,
+                   "Lines" = info_lines,
+                   "Sentences" = info_sentences,
+                   "Words" = info_words)
+info <- gather(info, Attribute, Count, -File)
+info$Count_1000 <- info$Count / 1000
+```
+
+```{r Bar_Chart, echo = FALSE, fig.height = 4, fig.width=8}
+l <- ggplot(data = info[info$Attribute == "Lines",], 
+            mapping = aes(x = File, y = Count_1000, fill = File, label = comma(round(Count_1000))))
+l <- l + 
+    geom_bar(stat = "identity", position = position_dodge()) +
+    ggtitle("Lines per File ('000)") +
+    theme(legend.position="none", axis.title.y=element_blank(),axis.title.x=element_blank()) +
+    geom_text(size = 3, position = position_stack(vjust = 0.5)) +
+    scale_y_continuous(label=comma)
+
+s <- ggplot(data = info[info$Attribute == "Sentences",], 
+            mapping = aes(x = File, y = Count_1000, fill = File, label = comma(round(Count_1000))))
+s <- s + 
+    geom_bar(stat = "identity", position = position_dodge()) +
+    ggtitle("Sentences per File ('000)") +
+    theme(legend.position="none", axis.title.y=element_blank(),axis.title.x=element_blank()) +
+    geom_text(size = 3, position = position_stack(vjust = 0.5)) +
+    scale_y_continuous(label=comma)
+
+w <- ggplot(data = info[info$Attribute == "Words",],
+            mapping = aes(x = File, y = Count_1000, fill = File, label = comma(round(Count_1000))))
+w <- w + 
+    geom_bar(stat = "identity", position = position_dodge()) +
+    ggtitle("Words per File ('000)") +
+    theme(legend.position="none", axis.title.y=element_blank(), axis.title.x=element_blank()) +
+    geom_text(size = 3, position = position_stack(vjust = 0.5)) +
+    scale_y_continuous(label=comma)
+
+cplot <- ggarrange(l, s, w,
+                    ncol = 3, nrow = 1)
+cplot
+```
+
+The results show that whilst the Twitter file has more records / lines and more sentences than the other 2 files, it contains fewer words. This actually balances things out reasonably well, as we need to construct a prediction model that works in the context of formed sentences. So even though the Twitter file has fewer words, the fact it has more sentences increases the value of its data.  
+
+Some other interesting features about the numbers of characters per line of data is listed below. 
+
+
+```{r Other_stats, echo = FALSE}
+blog_char <- sapply(blog,function(x) nchar(x))
+news_char <- sapply(news,function(x) nchar(x))
+twit_char <- sapply(twit,function(x) nchar(x))
+all_sum <- data.frame("File" = "Blog",
+                      "Minimum" = min(blog_char),
+                      "Median" = median(blog_char),
+                      "Maximum" = max(blog_char))
+suppressPackageStartupMessages(library(dplyr))
+all_sum <- all_sum %>% 
+    add_row(File = "News",
+            Minimum = min(news_char),
+            Median = median(news_char),
+            Maximum = max(news_char)) %>%
+    add_row(File = "Twitter",
+            Minimum = min(twit_char),
+            Median = median(twit_char),
+            Maximum = max(twit_char))
+detach(package:dplyr)
+```
+
+```{r Basic_Stats_Table, echo = FALSE}
+kable(all_sum, 
+      caption = 'Number of characters per record',
+      format.args = list(big.mark = ',')) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+Not unexpectedly, the maximum number of characters per line in the Twitter file is `r max(twit_char)`. Interestingly the maximum number of characters for News is only `r format(max(news_char),big.mark=",", trim=TRUE)` whereas for Blogs it is much higher, at `r format(max(blog_char),big.mark=",", trim=TRUE)`. This indicates that the news stories may not be complete news stories but rather a single paragraph of a single news story.  
+
+<br>
+
+## Data Processing - Tokenisation and N-Grams
+
+The next step is to combine all of the text data together into a single corpus, tokenise into words and then create a series of n-grams to look at the relationships between words. In order to achieve this the quanteda package is used:
+
+```{r Combine_datasets, echo = TRUE}
+ds <- append(news,blog)
+ds <- append(ds,twit)
+```
+
+```{r generate_corpus, echo = TRUE}
+c_ds <- corpus(ds)
+```
+
+```{r tokenise, echo = TRUE}
+# Tokenise into words
+tw_ds <- tokens(c_ds,
+                remove_punct = TRUE,
+                remove_symbols = TRUE,
+                remove_separators = TRUE)
+```
+
+The great thing about the quanteda package is that it is able to take care of things such as punctuation, symbols and separators which would otherwise make the task of cleaning data difficult. There are a couple of items to note, however:  
+
+* Profanity has not yet been removed.  
+    + It is intended that this will be removed in the final n-gram models used as the basis for the text prediction function.  
+    + The n-gram models will comprise a n-gram (e.g. "I am") and a predicted word (e.g. "happy"). The idea is that profanity will be removed from the predicted words so that the final product will not generate any profanity with its predictions.  
+    + Other options considered were:  
+        - Remove profanity from the base data, but this will bias the generated ngrams - i.e. the ngrams will not contain complete phrases if the profanity words are excluded.  
+        - Remove any entries containing profanity in their entirety - this is plausible however it means that should the user wish to predict the next word for a phrase containing profanity then the model would not be able to handle this.  
+* All tokens are generated in lower case (standard functionality in quanteda).  
+    + This means that all predictions in the final product will be in lower case as well.  
+    + This was not seen as being a problem for the final product.  
+
+<br>
+
+### Unigrams  
+
+We now have a "tokens" object in R which we can use to generate various n-gram models. Firstly we will create unigrams (i.e. look at individual words), generate an associated document feature matrix (dfm) and determine the top 20 unigrams in our dataset.
+
+```{r unigrams, echo = TRUE}
+ng1 <- tokens_ngrams(tw_ds,n=1)
+dfm_ng1 <- dfm(ng1)
+top_ng1 <- topfeatures(dfm_ng1,20)
+top_ng1 <- data.table("ngram" = names(top_ng1), "frequency" = top_ng1)
+```
+
+<br>
+
+```{r unigram_plot, echo = FALSE, fig.align = "center"}
+p <- ggplot(data = top_ng1, mapping = aes(x = reorder(ngram, -frequency), y = frequency))
+p <- p + 
+    geom_bar(stat = "identity", fill = "steelblue") + 
+    scale_y_continuous(labels = comma) + 
+    labs(x = "Unigram", y = "Frequency") +
+    ggtitle("Unigram Frequency Chart") +
+    theme(plot.title = element_text(hjust = 0.5))
+p
+```
+
+This table shows us the words which are most frequently found in the dataset. An alternate view to this rather plain representation of the data is to produce a wordcloud plot.  
+
+```{r unigram_wordcloud, echo = FALSE, out.height = "30%", out.width = "30%", fig.align = "center"}
+include_graphics("..\\Images\\unigram_wordcloud_cropped.jpg")
+```
+
+The most common words are those we would expect to see in any English text, which is a good indicator that the quanteda package has done what we expected.  
+
+<br>
+
+### Bigrams  
+
+We can now use the quanteda package to look at bigrams - sequences of 2 words - found throughout the source data. Using the same tokens dataset we will create the bigrams, generate a document feature matrix, determine the top 20 bigrams in the dataset and generate our plots.
+
+```{r bigrams, echo = FALSE}
+#ng2 <- tokens_ngrams(tw_ds,n=2, concatenator = " ")
+#dfm_ng2 <- dfm(ng2)
+#top_ng2 <- topfeatures(dfm_ng2,20)
+#top_ng2 <- data.table("ngram" = names(top_ng2), "frequency" = top_ng2)
+top_ng2 <- readRDS("..\\Data\\top_ng2.Rds")
+```
+
+```{r bigram_plot, echo = FALSE, fig.width = 10, fig.align = "center"}
+p <- ggplot(data = top_ng2, mapping = aes(x = reorder(ngram, -frequency), y = frequency))
+p <- p + 
+    geom_bar(stat = "identity", fill = "steelblue") + 
+    scale_y_continuous(labels = comma) + 
+    labs(x = "Bigram", y = "Frequency") +
+    ggtitle("Bigram Frequency Chart") +
+    theme(plot.title = element_text(hjust = 0.5))
+p
+```
+
+The more succinct wordcloud plot is shown below:
+
+```{r bigram_wordcloud, echo = FALSE, out.height = "30%", out.width = "30%", fig.align = "center"}
+include_graphics("..\\Images\\bigram_wordcloud_cropped.jpg")
+```
+
+Not surprisingly, almost all of these bigrams exclusively contain words that are in the top 20 unigrams. Again it looks like quanteda is doing exactly as we expect.  
+
+<br>
+
+## Next Steps  
+
+Now that we have a method for creating ngram models of the clean data, we are ready to embark on the next stage of the project which is to develop a text prediction product. The plan for this is to **keep it simple**! The idea is that we will create multiple ngram models from 2 to 5 ngrams. Each model will contain the n-1 words of the ngram as the "base", the nth word as the "predictor" and the frequency of occurrence in the corpus. It should be noted that it may be necessary to undertake sampling of the corpus due to the size of the document feature matrices generated by the qanteda package.  
+<br>
+This should be enough on its own to create a fairly simple model based on the Markov Assumption - which says that our best prediction of the next word is the immediately preceding n words. We know that this is a basic view of the world and ignores long distance dependencies in the language, but it might just be good enough for a fast performing text prediction product.  
+<br>
+It is envisaged that this will be improved using backoff methodologies, where for example the absence of a trigram in our source data to match our input data will result in the prediction algorithm backing off to a lower order ngram - in this case from a trigram to a bigram.  
+<br>
+Should the simplest model prove to be insufficient then other pathways will need to be explored using other natural language processing techniques such as probability smoothing, and potentially the use of other probability-based machine learning algorithms such as Naive Bayes.
