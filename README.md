@@ -5,6 +5,7 @@ A small collection of works to showcase my data science skills.
 ### Contents
 |File             |Description             |
 |:----------------|:-----------------------|
+|[Data Science Case Study](https://coxy-74.github.io/Data-Science-Portfolio/Other/Tourism%20Website%20Data%20science%20case%20study.pdf) |Case study prepared for Online Tourism company to describe predictors for various field responses on their website| 
 |[Analysis of Titanic Survivors](https://coxy-74.github.io/Data-Science-Portfolio/Kaggle/Titanic/Titanic-Report.html) |Report of model generated to predict if a passenger survived on the Titanic for Kaggle competition| 
 |[Analysis of World Poverty Data](https://coxy-74.github.io/Data-Science-Portfolio/Microsoft/Analysis%20of%20World%20Poverty%20Data.pdf)|Capstone Project for Microsoft Professional Program in Data Science|
 |[Text Prediction App Milestone Report](https://coxy-74.github.io/Data-Science-Portfolio/Coursera/Capstone/Milestone-Report.html)|Interim milestone report for Capstone Project for the Coursera Data Science Specialisation|
